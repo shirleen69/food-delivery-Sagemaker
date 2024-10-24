@@ -1,0 +1,41 @@
+aws codebuild create-project \
+  --name intern-fooddelivery-buildproject \
+  --source type=CODECOMMIT,location=https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/intern-experimentation \
+  --artifacts type=NO_ARTIFACTS \
+  --environment type=LINUX_CONTAINER,image=aws/codebuild/amazonlinux2-x86_64-standard:5.0,computeType=BUILD_GENERAL1_SMALL,privilegedMode=true \
+  --service-role arn:aws:iam::905418043174:role/service-role/codebuild-intern-fooddelivery-build-role \
+  --region eu-west-1 \
+  --source-version master 
+  
+  
+  
+  aws codebuild start-build --project-name intern-fooddelivery-buildproject
+
+  aws codebuild batch-get-builds --ids intern-fooddelivery-buildproject:0889ac0d-11db-4ffb-bb80-bd498d507203
+
+
+aws codebuild create-project \
+  --name intern-fooddelivery-buildproject \
+  --source type=CODECOMMIT,location=https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/intern-experimentation \
+  --artifacts type=NO_ARTIFACTS \
+  --environment type=LINUX_CONTAINER,image=aws/codebuild/amazonlinux2-x86_64-standard:5.0,computeType=BUILD_GENERAL1_SMALL,privilegedMode=true \
+  --service-role arn:aws:iam::905418043174:role/service-role/codebuild-intern-fooddelivery-build-role \
+  --region eu-west-1 \
+  --source-version master \
+  --logs-config '{"cloudWatchLogs": {"status": "ENABLED", "groupName": "/aws/codebuild/intern-fooddelivery-buildproject"}}'
+  
+  
+
+
+aws codebuild create-project \
+  --name intern-fooddelivery-buildproject \
+  --source type=CODECOMMIT,location=https://git-codecommit.eu-west-1.amazonaws.com/v1/repos/intern-experimentation \
+  --artifacts type=NO_ARTIFACTS \
+  --environment type=LINUX_CONTAINER,image=aws/codebuild/amazonlinux2-x86_64-standard:5.0,computeType=BUILD_GENERAL1_SMALL,privilegedMode=true \
+  --service-role arn:aws:iam::905418043174:role/service-role/codebuild-intern-fooddelivery-build-role \
+  --region eu-west-1 \
+  --source-version master \
+  --logs-config '{"s3Logs": {"status": "ENABLED", "location": "interns-aws-experimentation-bucket/codebuild-logs"}}'
+
+
+

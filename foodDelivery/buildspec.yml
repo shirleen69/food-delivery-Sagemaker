@@ -1,0 +1,51 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: "eu-west-1"
+    REPOSITORY_URI: "#############/food-delivery"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.10
+    commands:
+      - echo Installing dependencies...
+      - pip install -r foodDelivery/requirements.txt
+
+  pre_build:
+    commands:
+      - echo Pre-build phase:Logging in to Amazon ECR...
+      - aws --version
+      - echo $AWS_DEFAULT_REGION
+      - echo $REPOSITORY_URI
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $REPOSITORY_URI
+
+  build:
+    commands:
+      - echo Build phase:Running training script...
+      - python foodDelivery/scripts/delivery_train.py
+      - echo Build phase:Building the Docker image for inference...
+      - docker build -t $REPOSITORY_URI:latest -f foodDelivery/Dockerfile .
+
+  post_build:
+    commands:
+      - echo Post-build phase:Running tests and copying test results...
+      - python foodDelivery/tests/test_delivery_train.py
+      - python foodDelivery/tests/test_delivery_inference.py
+      - echo Post-build phase:Pushing the Docker image for inference...
+      - docker push $REPOSITORY_URI:latest
+
+artifacts:
+  files:
+    - foodDelivery/test-results/**
+    - foodDelivery/models/**
+    - foodDelivery/scripts/**
+    - foodDelivery/tests/**
+    - foodDelivery/data/**
+    - foodDelivery/results/**
+  discard-paths: yes
+
+cache:
+  paths:
+    - /root/.cache/pip

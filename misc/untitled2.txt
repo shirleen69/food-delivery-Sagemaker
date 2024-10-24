@@ -1,0 +1,160 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Sets up a SageMaker processing job using ECR image and stores the results locally
+
+Resources:
+  SageMakerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sagemaker.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: SageMakerExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:BatchCheckLayerAvailability
+                Resource: 'arn:aws:ecr:eu-west-1:905418043174:repository/intern-experimentation'
+              - Effect: Allow
+                Action:
+                  - sagemaker:CreateProcessingJob
+                  - sagemaker:DescribeProcessingJob
+                  - sagemaker:StopProcessingJob
+                Resource: '*'
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaExecutionPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - sagemaker:CreateProcessingJob
+                  - sagemaker:DescribeProcessingJob
+                  - iam:PassRole
+                Resource: '*'
+
+  SageMakerProcessingJobFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import time
+          import cfnresponse
+
+          def handler(event, context):
+              sagemaker = boto3.client('sagemaker')
+              response_data = {}
+              try:
+                  if event['RequestType'] == 'Create' or event['RequestType'] == 'Update':
+                      role_arn = event['ResourceProperties']['RoleArn']
+                      image_uri = event['ResourceProperties']['ImageUri']
+
+                      response = sagemaker.create_processing_job(
+                          ProcessingJobName=f'processing-job-{int(time.time())}',
+                          ProcessingResources={
+                              'ClusterConfig': {
+                                  'InstanceCount': 1,
+                                  'InstanceType': 'ml.m5.xlarge',
+                                  'VolumeSizeInGB': 30,
+                              }
+                          },
+                          AppSpecification={
+                              'ImageUri': image_uri,
+                              'ContainerEntrypoint': ['bash', '-c', 'pip install --no-cache-dir -r /delivery-app/foodDelivery/requirements.txt && python3 /delivery-app/foodDelivery/scripts/delivery_inference.py']
+                          },
+                          RoleArn=role_arn,
+                          ProcessingInputs=[
+                              {
+                                  'InputName': 'input-1',
+                                  'S3Input': {
+                                      'LocalPath': '/delivery-app',
+                                      'S3DataType': 'S3Prefix',
+                                      'S3InputMode': 'File'
+                                  }
+                              },
+                              {
+                                  'InputName': 'data-input',
+                                  'S3Input': {
+                                      'LocalPath': '/delivery-app/foodDelivery/data',
+                                      'S3DataType': 'S3Prefix',
+                                      'S3InputMode': 'File'
+                                  }
+                              },
+                              {
+                                  'InputName': 'model-input',
+                                  'S3Input': {
+                                      'LocalPath': '/delivery-app/foodDelivery/models',
+                                      'S3DataType': 'S3Prefix',
+                                      'S3InputMode': 'File'
+                                  }
+                              }
+                          ],
+                          ProcessingOutputConfig={
+                              'Outputs': [
+                                  {
+                                      'OutputName': 'output-1',
+                                      'S3Output': {
+                                          'LocalPath': '/delivery-app/foodDelivery/results',
+                                          'S3UploadMode': 'EndOfJob'
+                                      }
+                                  }
+                              ]
+                          },
+                      )
+                      response_data['Message'] = 'Processing job created successfully'
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+                  elif event['RequestType'] == 'Delete':
+                      # Implement delete logic if required
+                      response_data['Message'] = 'No action needed for delete'
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+
+              except Exception as e:
+                  print(f"Error: {e}")
+                  response_data['Message'] = str(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+
+      Runtime: python3.10
+      Timeout: 300
+      MemorySize: 128
+
+  SageMakerProcessingJobCustomResource:
+    Type: Custom::SageMakerProcessingJob
+    Properties:
+      ServiceToken: !GetAtt SageMakerProcessingJobFunction.Arn
+      RoleArn: !GetAtt SageMakerExecutionRole.Arn
+      ImageUri: '905418043174.dkr.ecr.eu-west-1.amazonaws.com/intern-experimentation:latest'
+
+Outputs:
+  ProcessingJobResponse:
+    Description: Response from the SageMaker processing job
+    Value: !GetAtt SageMakerProcessingJobCustomResource.Response

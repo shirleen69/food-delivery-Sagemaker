@@ -1,0 +1,15 @@
+pandas
+numpy 
+tensorflow
+scikit-learn
+plotly
+keras
+statsmodels
+joblib
+pytest
+pytest-mock
+pytest-cov
+pytest-html
+moto
+boto3
+

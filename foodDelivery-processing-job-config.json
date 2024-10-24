@@ -1,0 +1,31 @@
+{
+  "ProcessingJobName": "intern-Delivery-food-processing-job",
+  "ProcessingResources": {
+    "ClusterConfig": {
+      "InstanceCount": 1,
+      "InstanceType": "ml.m5.xlarge",
+      "VolumeSizeInGB": 30
+    }
+  },
+  "AppSpecification": {
+    "ImageUri": "##########.dkr.##########.amazonaws.com/food-delivery:latest",
+    "ContainerEntrypoint": [
+      "bash",
+      "-c",
+      "pip install --no-cache-dir -r /opt/ml/processing/foodDelivery/requirements.txt && python /opt/ml/processing/foodDelivery/scripts/delivery_inference.py"
+    ]
+  },
+  "RoleArn": "arn:aws:iam::##########:role/Sagemaker-Endpoint-Creation-Role",
+  "ProcessingOutputConfig": {
+    "Outputs": [
+      {
+        "OutputName": "output-1",
+        "S3Output": {
+          "S3Uri": "s3://interns-aws-experimentation-bucket/results/",
+          "LocalPath": "/opt/ml/processing/foodDelivery/results/",
+          "S3UploadMode": "EndOfJob"
+        }
+      }
+    ]
+  }
+}
